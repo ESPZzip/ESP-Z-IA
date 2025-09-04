@@ -1,121 +1,331 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <title>ECSR.io — Página + Admin</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ECSR.io — Página + Admin (Full Screen)</title>
   <style>
-    body { font-family: Arial, sans-serif; background:#f1f5f9; margin:0; }
-    header { background:#1e293b; color:white; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; }
-    header h1 { margin:0; font-size:18px; }
-    header button { background:#2563eb; border:none; color:white; padding:6px 12px; border-radius:6px; cursor:pointer; }
-    .container { padding:20px; }
-    .block { background:white; border-radius:8px; padding:15px; margin-bottom:15px; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
-    .card { background:#1e293b; padding:15px; border-radius:8px; margin-bottom:15px; color:#f1f5f9; }
-    label { display:block; margin-bottom:5px; }
-    input, textarea { width:100%; padding:8px; border-radius:6px; border:1px solid #334155; margin-bottom:10px; background:#0f172a; color:#f1f5f9; }
-    button.action { background:#10b981; color:white; padding:8px 12px; border:none; border-radius:6px; cursor:pointer; }
-    button.delete { background:#ef4444; padding:6px 10px; }
-    #status { margin-top:10px; font-weight:bold; }
-    .hidden { display:none; }
+    /* ---- Pantalla completa y reset mínimo ---- */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; width: 100%; margin: 0; }
+    body { overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1220; color:#e5e7eb; }
+
+    /* ---- App shell a pantalla completa ---- */
+    #app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr; }
+
+    header {
+      background:#111827; border-bottom:1px solid #1f2937;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 16px;
+    }
+    header h1 { font-size:16px; margin:0; font-weight:600; }
+    header .right { display:flex; gap:8px; align-items:center }
+    .btn { cursor:pointer; border:1px solid #1f2937; background:#0f172a; color:#e5e7eb; padding:8px 12px; border-radius:10px }
+    .btn.primary { background:#2563eb; border-color:#1d4ed8; }
+    .btn.warn { background:#f59e0b; border-color:#b45309; color:#111827; }
+    .badge { border:1px solid #1f2937; border-radius:999px; padding:2px 8px; font-size:12px; color:#9ca3af }
+
+    /* ---- Vista pública (scrollable) ---- */
+    #public { overflow:auto; padding:16px; background: radial-gradient(80% 80% at 50% 0%, #0e1424 0%, #0b1220 55%, #0b1220 100%); }
+    .grid { display:grid; gap:12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    .card {
+      background: linear-gradient(180deg, #0f172a, #0b1220); border:1px solid #1f2937;
+      border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    .card h2 { margin:0 0 8px; font-size:18px }
+    .muted { color:#9ca3af; font-size:12px }
+
+    /* ---- Overlay Admin a pantalla completa ---- */
+    #adminOverlay {
+      position: fixed; inset: 0; background: rgba(10, 15, 26, 0.98);
+      display: none; z-index: 2147483647; /* MUY ALTO, sobre todo */
+    }
+    #adminPanel {
+      height: 100%; width: 100%;
+      display: grid; grid-template-rows: auto 1fr; gap: 0;
+    }
+    #adminBar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 16px; border-bottom:1px solid #1f2937; background:#0f172a;
+    }
+    #adminBody {
+      display:grid; grid-template-columns: 340px 1fr; gap: 12px; padding:12px; overflow: hidden;
+    }
+    .pane { overflow:auto; border:1px solid #1f2937; border-radius:14px; background:#0b1220; padding:12px; }
+    label { display:block; margin:8px 0 6px; font-size:13px; color:#cbd5e1 }
+    input, textarea, select {
+      width:100%; padding:10px 12px; border:1px solid #1f2937; border-radius:10px;
+      background:#0a0f1a; color:#e5e7eb;
+    }
+    textarea { min-height:120px; resize:vertical }
+    .preview { background:#0a0f1a; border:1px dashed #1f2937; border-radius:12px; padding:12px; min-height:80px }
+    .row { display:grid; gap:8px; grid-template-columns: 1fr 1fr }
+
+    /* Tarjeta en Admin list */
+    .blk { background:#0f172a; border:1px solid #1f2937; border-radius:12px; padding:10px; margin-bottom:10px }
+    .blk h3 { margin:0 0 6px; font-size:15px }
+    .actions { display:flex; gap:6px; flex-wrap:wrap }
+    .draggable { cursor:grab }
+    .drag-over { outline:2px dashed #2563eb; }
+
+    /* Toast */
+    #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px;
+      background:#111827; color:#e5e7eb; border:1px solid #1f2937; border-radius:10px; padding:10px 14px; display:none; z-index:2147483647 }
   </style>
 </head>
 <body>
-  <header>
-    <h1>ECSR.io</h1>
-    <button id="toggleModeBtn">🔑 Admin</button>
-  </header>
+  <div id="app" aria-live="polite">
+    <header>
+      <h1>ECSR.io — Página Pública</h1>
+      <div class="right">
+        <span id="pubInfo" class="badge">—</span>
+        <button id="openAdmin" class="btn primary" title="Ctrl+Shift+A">🔑 Admin</button>
+      </div>
+    </header>
 
-  <div id="publicView" class="container">
-    <h2>Contenido público</h2>
-    <div id="mainContent"></div>
+    <main id="public">
+      <div class="grid" id="publicGrid"></div>
+    </main>
   </div>
 
-  <div id="adminView" class="container hidden">
-    <div class="card">
-      <h2>Agregar Bloque</h2>
-      <label>Título</label>
-      <input id="blockTitle">
-      <label>Contenido</label>
-      <textarea id="blockContent" rows="4"></textarea>
-      <button class="action" id="addBlockBtn">Agregar</button>
-    </div>
+  <!-- Overlay Admin FULL SCREEN -->
+  <div id="adminOverlay" role="dialog" aria-modal="true">
+    <div id="adminPanel">
+      <div id="adminBar">
+        <strong>Panel de Administración — ECSR.io</strong>
+        <div class="right">
+          <button id="publishBtn" class="btn warn">📢 Publicar</button>
+          <button id="closeAdmin" class="btn">✕ Cerrar</button>
+        </div>
+      </div>
 
-    <div class="card">
-      <h2>Vista previa</h2>
-      <div id="preview"></div>
-    </div>
+      <div id="adminBody">
+        <!-- Lado izquierdo: editor -->
+        <div class="pane" id="editorPane">
+          <h3>Nuevo bloque</h3>
+          <label>Título</label>
+          <input id="blkTitle" placeholder="Título">
+          <label>Contenido (HTML básico permitido)</label>
+          <textarea id="blkContent" placeholder="<p>Texto...</p>"></textarea>
+          <div class="row">
+            <div>
+              <label>Imagen (URL opcional)</label>
+              <input id="blkImage" placeholder="https://...">
+            </div>
+            <div>
+              <label>Enlace (opcional)</label>
+              <input id="blkLink" placeholder="/ruta o https://...">
+            </div>
+          </div>
+          <label>Previsualización</label>
+          <div id="blkPreview" class="preview">—</div>
+          <div style="margin-top:10px" class="actions">
+            <button id="addBlock" class="btn primary">Agregar</button>
+            <button id="clearForm" class="btn">Limpiar</button>
+          </div>
+          <p class="muted">Atajo de teclado: <strong>Ctrl+Shift+A</strong> abre/cierra el panel.</p>
+        </div>
 
-    <button id="publishBtn">📢 Publicar cambios</button>
-    <div id="status"></div>
+        <!-- Lado derecho: lista -->
+        <div class="pane" id="listPane">
+          <h3>Bloques (borradores)</h3>
+          <div id="draftList"></div>
+          <hr style="border-color:#1f2937; margin:12px 0">
+          <h3>Publicado (lo que ve el público)</h3>
+          <div id="publishedList"></div>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <div id="toast"></div>
 
   <script>
-    // --- Data en localStorage ---
-    const STORAGE_KEY = 'ecsr_blocks';
-    let blocks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    // ---- Claves de almacenamiento ----
+    const K_DRAFTS = 'ecsr_draft_blocks';
+    const K_PUBLISHED = 'ecsr_published_blocks';
+    const K_LAST_PUBLISH = 'ecsr_last_publish';
 
-    // --- Public view ---
-    function renderPublic() {
-      const container = document.getElementById('mainContent');
-      container.innerHTML = '';
-      blocks.forEach(b => {
-        const div = document.createElement('div');
-        div.className = 'block';
-        div.innerHTML = `<h2>${b.title}</h2><p>${b.content}</p>`;
-        container.appendChild(div);
+    // ---- Estado ----
+    let drafts = JSON.parse(localStorage.getItem(K_DRAFTS) || '[]');
+    let published = JSON.parse(localStorage.getItem(K_PUBLISHED) || '[]');
+
+    // ---- Utilidades ----
+    const $ = s => document.querySelector(s);
+    const el = (tag, html) => { const d=document.createElement(tag); d.innerHTML = html; return d.firstElementChild; };
+    const toast = (t) => { const n = $('#toast'); n.textContent = t; n.style.display='block'; setTimeout(()=>n.style.display='none', 2000); };
+
+    function sanitizeAdminHtml(s){
+      // Permite sólo etiquetas seguras básicas
+      const tmp = document.createElement('div'); tmp.innerHTML = s;
+      const allowed = new Set(['B','I','U','BR','P','UL','OL','LI','A','STRONG','EM','H1','H2','H3','H4','H5','H6','SPAN']);
+      (function walk(node){
+        [...node.childNodes].forEach(n=>{
+          if(n.nodeType===1){
+            if(!allowed.has(n.tagName)){ const t = document.createTextNode(n.textContent); n.replaceWith(t); }
+            else {
+              [...n.attributes].forEach(a=>{ if(!['href'].includes(a.name)) n.removeAttribute(a.name); });
+              walk(n);
+            }
+          }
+        });
+      })(tmp);
+      return tmp.innerHTML;
+    }
+
+    // ---- Render Público (pantalla completa) ----
+    function renderPublic(){
+      const grid = $('#publicGrid');
+      grid.innerHTML = '';
+      published.forEach(b=>{
+        const card = el('div', `
+          <div class="card">
+            ${b.image ? `<img src="${b.image}" alt="" style="width:100%; border-radius:12px; margin-bottom:8px; max-height:200px; object-fit:cover">` : ''}
+            <h2>${b.title}</h2>
+            <div class="muted" style="margin-bottom:6px">${b.link ? `<a href="${b.link}" style="color:#60a5fa; text-decoration:none">${b.link}</a>` : ''}</div>
+            <div>${b.content}</div>
+          </div>
+        `);
+        grid.appendChild(card);
+      });
+      const last = localStorage.getItem(K_LAST_PUBLISH);
+      $('#pubInfo').textContent = last ? ('Publicado: ' + new Date(last).toLocaleString()) : 'Sin publicaciones';
+    }
+
+    // ---- Render Admin ----
+    function renderDrafts(){
+      const list = $('#draftList'); list.innerHTML = '';
+      drafts.forEach((b, idx)=>{
+        const item = el('div', `
+          <div class="blk draggable" draggable="true" data-idx="${idx}">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <h3>${b.title}</h3>
+              <div class="actions">
+                <button class="btn" data-act="edit">Editar</button>
+                <button class="btn" data-act="del" style="border-color:#7f1d1d; background:#3a0b0b">Eliminar</button>
+              </div>
+            </div>
+            ${b.image ? `<img src="${b.image}" alt="" style="width:100%; border-radius:8px; margin:6px 0; max-height:140px; object-fit:cover">` : ''}
+            <div class="muted">Orden: ${idx}</div>
+            <div class="preview" style="margin-top:6px">${b.content}</div>
+          </div>
+        `);
+        // acciones
+        item.addEventListener('click', (ev)=>{
+          const act = ev.target?.dataset?.act;
+          if(act==='del'){ drafts.splice(idx,1); persistDrafts(); renderDrafts(); }
+          if(act==='edit'){ fillEditor(b, idx); }
+        });
+        // drag & drop
+        item.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', idx); });
+        item.addEventListener('dragover', (e)=>{ e.preventDefault(); item.classList.add('drag-over'); });
+        item.addEventListener('dragleave', ()=> item.classList.remove('drag-over'));
+        item.addEventListener('drop', (e)=>{
+          e.preventDefault(); item.classList.remove('drag-over');
+          const from = +e.dataTransfer.getData('text/plain'); const to = idx;
+          if(from===to) return;
+          const [m] = drafts.splice(from,1); drafts.splice(to,0,m);
+          persistDrafts(); renderDrafts();
+        });
+        list.appendChild(item);
       });
     }
 
-    // --- Admin view ---
-    function renderAdmin() {
-      const preview = document.getElementById('preview');
-      preview.innerHTML = '';
-      blocks.forEach((b, idx) => {
-        const div = document.createElement('div');
-        div.className = 'block';
-        div.innerHTML = `<h3>${b.title}</h3><p>${b.content}</p>
-                         <button class='delete' onclick='deleteBlock(${idx})'>Eliminar</button>`;
-        preview.appendChild(div);
+    function renderPublished(){
+      const list = $('#publishedList'); list.innerHTML = '';
+      published.forEach((b, idx)=>{
+        const item = el('div', `
+          <div class="blk">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <h3>${b.title}</h3>
+              <div class="actions">
+                <button class="btn" data-act="copy">Copiar a borradores</button>
+                <button class="btn" data-act="remove" style="border-color:#7f1d1d; background:#3a0b0b">Quitar (no borra histórico)</button>
+              </div>
+            </div>
+            <div class="preview" style="margin-top:6px">${b.content}</div>
+          </div>
+        `);
+        item.addEventListener('click', (ev)=>{
+          const act = ev.target?.dataset?.act;
+          if(act==='copy'){ drafts.push({...b}); persistDrafts(); renderDrafts(); toast('Copiado a borradores'); }
+          if(act==='remove'){ published.splice(idx,1); persistPublished(); renderPublished(); renderPublic(); }
+        });
+        list.appendChild(item);
       });
     }
 
-    function deleteBlock(idx) {
-      blocks.splice(idx,1);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
-      renderAdmin();
-      renderPublic();
+    function persistDrafts(){ localStorage.setItem(K_DRAFTS, JSON.stringify(drafts)); }
+    function persistPublished(){ localStorage.setItem(K_PUBLISHED, JSON.stringify(published)); }
+
+    // ---- Editor ----
+    function fillEditor(b={}, idx=null){
+      $('#blkTitle').value = b.title || '';
+      $('#blkContent').value = b.content || '';
+      $('#blkImage').value = b.image || '';
+      $('#blkLink').value = b.link || '';
+      $('#blkPreview').innerHTML = b.content || '—';
+      $('#addBlock').textContent = idx===null ? 'Agregar' : 'Guardar cambios';
+      $('#addBlock').dataset.editIndex = idx===null ? '' : String(idx);
     }
 
-    document.getElementById('addBlockBtn').onclick = () => {
-      const title = document.getElementById('blockTitle').value.trim();
-      const content = document.getElementById('blockContent').value.trim();
-      if (!title || !content) return alert('Completa título y contenido');
-      blocks.push({ title, content });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
-      document.getElementById('blockTitle').value = '';
-      document.getElementById('blockContent').value = '';
-      renderAdmin();
-    };
+    // preview en vivo
+    ['blkContent'].forEach(id=>{
+      document.getElementById(id).addEventListener('input', ()=>{
+        $('#blkPreview').innerHTML = sanitizeAdminHtml($('#blkContent').value);
+      });
+    });
 
-    document.getElementById('publishBtn').onclick = () => {
-      const status = document.getElementById('status');
-      status.textContent = '✅ Cambios guardados localmente';
+    // agregar / guardar
+    $('#addBlock').addEventListener('click', ()=>{
+      const data = {
+        title: $('#blkTitle').value.trim(),
+        content: sanitizeAdminHtml($('#blkContent').value.trim()),
+        image: $('#blkImage').value.trim(),
+        link: $('#blkLink').value.trim()
+      };
+      if(!data.title || !data.content) return toast('Completa título y contenido');
+      const idx = $('#addBlock').dataset.editIndex;
+      if(idx===''){ drafts.push(data); }
+      else { drafts[+idx] = data; $('#addBlock').dataset.editIndex=''; $('#addBlock').textContent='Agregar'; }
+      persistDrafts(); renderDrafts(); fillEditor({});
+      toast('Guardado en borradores');
+    });
+
+    $('#clearForm').addEventListener('click', ()=> fillEditor({}));
+
+    // ---- Publicar (lo que verá toda la página) ----
+    $('#publishBtn').addEventListener('click', ()=>{
+      if(!confirm('¿Publicar borradores y reemplazar el contenido público?')) return;
+      published = drafts.map(x=>({...x})); // clonar
+      persistPublished();
+      localStorage.setItem(K_LAST_PUBLISH, new Date().toISOString());
+      renderPublished(); renderPublic();
+      toast('Publicado correctamente');
+    });
+
+    // ---- Abrir / cerrar overlay admin (full screen) ----
+    const openAdmin = ()=>{ $('#adminOverlay').style.display='block'; };
+    const closeAdmin = ()=>{ $('#adminOverlay').style.display='none'; };
+    $('#openAdmin').addEventListener('click', openAdmin);
+    $('#closeAdmin').addEventListener('click', closeAdmin);
+
+    // Atajo Ctrl+Shift+A
+    window.addEventListener('keydown', (e)=>{
+      if(e.ctrlKey && e.shiftKey && (e.key==='A' || e.key==='a')){
+        const open = $('#adminOverlay').style.display!=='block';
+        open ? openAdmin() : closeAdmin();
+      }
+    });
+
+    // ---- Primer render ----
+    function boot(){
       renderPublic();
-    };
-
-    // --- Toggle entre vistas ---
-    const toggleBtn = document.getElementById('toggleModeBtn');
-    toggleBtn.onclick = () => {
-      document.getElementById('publicView').classList.toggle('hidden');
-      document.getElementById('adminView').classList.toggle('hidden');
-      toggleBtn.textContent = 
-        document.getElementById('adminView').classList.contains('hidden') 
-        ? '🔑 Admin' : '🌐 Público';
-    };
-
-    // Render inicial
-    renderPublic();
-    renderAdmin();
+      renderDrafts();
+      renderPublished();
+      fillEditor({});
+    }
+    boot();
   </script>
 </body>
 </html>
