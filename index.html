@@ -1,291 +1,105 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Chat de Inteligencia Artificial</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root { color-scheme: light dark; }
-    html { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; }
-    /* Scrollbars sutiles */
-    .nice-scroll::-webkit-scrollbar { width: 10px; }
-    .nice-scroll::-webkit-scrollbar-thumb { border-radius: 9999px; background: #cbd5e1; }
-    .nice-scroll::-webkit-scrollbar-track { background: transparent; }
-    /* Burbuja con animación de escritura */
-    .dots::after { content: "···"; animation: blink 1s infinite steps(1); }
-    @keyframes blink { 50% { opacity: 0; } }
-  </style>
-</head>
-<body class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50">
-  <div class="mx-auto max-w-4xl p-4 sm:p-8">
-    <!-- Header -->
-    <header class="flex items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Chat de IA</h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400">Una página simple con streaming en tiempo real usando la API de OpenAI</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <button id="btnApiKey" class="px-3 py-2 text-sm rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700">Configurar clave</button>
-        <button id="btnBorrar" title="Borrar conversación" class="px-3 py-2 text-sm rounded-xl bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-200 dark:hover:bg-red-900/60">Borrar</button>
-      </div>
-    </header>
+// server.js
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import cors from 'cors';
 
-    <!-- Contenedor principal -->
-    <main class="mt-6 grid grid-rows-[1fr_auto] h-[78vh] sm:h-[76vh] rounded-2xl bg-white/70 dark:bg-white/5 shadow-sm border border-slate-200 dark:border-white/10 overflow-hidden">
-      <!-- Mensajes -->
-      <div id="messages" class="nice-scroll overflow-y-auto p-4 sm:p-6 space-y-4">
-        <!-- Mensaje de bienvenida -->
-        <div class="flex gap-3 items-start">
-          <div class="shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 grid place-items-center">🤖</div>
-          <div class="max-w-[85%] rounded-2xl rounded-tl-none bg-indigo-50 dark:bg-indigo-900/30 p-3 text-sm leading-6 whitespace-pre-wrap">¡Hola! Soy tu asistente. Pregúntame lo que quieras ✨</div>
-        </div>
-      </div>
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-      <!-- Input -->
-      <form id="chatForm" class="border-t border-slate-200 dark:border-white/10 bg-white/60 dark:bg-slate-950/40 p-3">
-        <div class="flex items-end gap-2">
-          <textarea id="prompt" required rows="1" placeholder="Escribe tu mensaje y presiona Enter…" class="flex-1 resize-none max-h-40 rounded-2xl border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-950/70 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-          <button id="sendBtn" class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" type="submit">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2.94 2.94a.75.75 0 0 1 .82-.16l13 5a.75.75 0 0 1 0 1.38l-13 5A.75.75 0 0 1 2 13.5v-3.8a.75.75 0 0 1 .64-.74l8.4-1.2-8.4-1.2A.75.75 0 0 1 2 4.76v-1.8a.75.75 0 0 1 .94-.02Z"/></svg>
-            Enviar
-          </button>
-        </div>
-        <div class="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <div>
-            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
-              <input id="toggleSystem" type="checkbox" class="rounded border-slate-300 dark:border-white/10">
-              <span>Incluir instrucciones de sistema</span>
-            </label>
-          </div>
-          <div class="flex items-center gap-2">
-            <label class="sr-only" for="model">Modelo</label>
-            <select id="model" class="rounded-xl border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-950/60 px-2 py-1">
-              <option value="gpt-4o-mini" selected>gpt-4o-mini (rápido y barato)</option>
-              <option value="gpt-4o">gpt-4o (mejor calidad)</option>
-            </select>
-          </div>
-        </div>
-      </form>
-    </main>
+const JWT_SECRET = process.env.JWT_SECRET || 'cambia-esto';
+const ADMIN_USERS = [
+  // Hash generado con: bcrypt.hash('TuPassFuerte123', 12)
+  { id: 'admin-1', email: 'admin@ecsr.io', passwordHash: '$2b$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', role: 'admin' }
+];
 
-    <!-- Pie -->
-    <footer class="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
-      <p>Demo educativa. No expongas tu clave en producción. Usa un backend/proxy.</p>
-    </footer>
-  </div>
+// Simulaciones de datos
+const users = [
+  { id: 'u1', username: 'mateo', status: 'ok', open_reports: 0 },
+  { id: 'u2', username: 'userX', status: 'warned', open_reports: 2 }
+];
 
-  <script>
-    // ====== Utilidades de estado ======
-    const $messages = document.getElementById('messages');
-    const $form = document.getElementById('chatForm');
-    const $prompt = document.getElementById('prompt');
-    const $send = document.getElementById('sendBtn');
-    const $btnApiKey = document.getElementById('btnApiKey');
-    const $btnBorrar = document.getElementById('btnBorrar');
-    const $model = document.getElementById('model');
-    const $toggleSystem = document.getElementById('toggleSystem');
+const reports = [
+  { id: 'r1', reporter_username: 'mateo', reported_username: 'userX', reported_id: 'u2', reason: 'acoso', status: 'open', conversation_id: 'c42' }
+];
 
-    const SYS_PROMPT = "Eres un asistente útil, breve y amable. Responde en el idioma del usuario.";
+const conversations = {
+  'c42': { id: 'c42', messages: [
+    { ts: Date.now()-600000, from: 'mateo', text: 'hola' },
+    { ts: Date.now()-590000, from: 'userX', text: 'mensaje cuestionable' }
+  ], muted: false }
+};
 
-    const store = {
-      get key() { return localStorage.getItem('openai_key') || ''; },
-      set key(v) { localStorage.setItem('openai_key', v || ''); },
-      history: /** @type {Array<{role:'user'|'assistant', content:string}>} */([]),
-      reset() { this.history = []; saveTranscript(); }
-    };
+// Middleware auth
+function authAdmin(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.replace(/^Bearer /, '');
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.role !== 'admin') return res.status(403).send('Forbidden');
+    req.admin = payload; next();
+  } catch {
+    return res.status(401).send('Unauthorized');
+  }
+}
 
-    function saveTranscript() {
-      try { localStorage.setItem('chat_history', JSON.stringify(store.history)); } catch {}
-    }
-    function loadTranscript() {
-      try {
-        const raw = localStorage.getItem('chat_history');
-        if (raw) store.history = JSON.parse(raw);
-      } catch {}
-    }
+// Auth
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  const admin = ADMIN_USERS.find(a => a.email === email);
+  if (!admin) return res.status(401).send('Credenciales inválidas');
+  const ok = await bcrypt.compare(password, admin.passwordHash);
+  if (!ok) return res.status(401).send('Credenciales inválidas');
+  const token = jwt.sign({ sub: admin.id, role: 'admin', email }, JWT_SECRET, { expiresIn: '2h' });
+  res.json({ token });
+});
 
-    // Auto-resize del textarea
-    function autoresize() {
-      $prompt.style.height = 'auto';
-      $prompt.style.height = Math.min($prompt.scrollHeight, 240) + 'px';
-    }
-    $prompt.addEventListener('input', autoresize);
+// Moderación
+app.get('/api/mod/reports', authAdmin, (req, res) => res.json(reports));
 
-    // Enter para enviar
-    $prompt.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        $form.requestSubmit();
-      }
-    });
+app.get('/api/mod/users/:idOrName', authAdmin, (req, res) => {
+  const q = req.params.idOrName.toLowerCase();
+  const u = users.find(x => x.id === q || x.username.toLowerCase() === q);
+  if (!u) return res.status(404).send('Usuario no encontrado');
+  res.json(u); // Nota: nunca devolver hashes ni datos sensibles
+});
 
-    // Configurar/solicitar API Key
-    $btnApiKey.addEventListener('click', () => {
-      const current = store.key;
-      const v = prompt('Pega tu OpenAI API Key (comienza con "sk-")', current);
-      if (v !== null) store.key = v.trim();
-    });
+app.post('/api/mod/ban', authAdmin, (req, res) => {
+  const { userId, reason } = req.body || {};
+  // Marca en DB y revoca tokens/sesiones
+  console.log(`BAN -> ${userId} por ${reason}`);
+  res.json({ ok: true });
+});
 
-    // Borrar conversación
-    $btnBorrar.addEventListener('click', () => {
-      if (confirm('¿Borrar la conversación?')) {
-        store.reset();
-        $messages.innerHTML = `
-          <div class="flex gap-3 items-start">
-            <div class="shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 grid place-items-center">🤖</div>
-            <div class="max-w-[85%] rounded-2xl rounded-tl-none bg-indigo-50 dark:bg-indigo-900/30 p-3 text-sm leading-6 whitespace-pre-wrap">¡Hola! Soy tu asistente. Pregúntame lo que quieras ✨</div>
-          </div>`;
-        $prompt.value = '';
-        autoresize();
-      }
-    });
+app.get('/api/mod/conversations/:id', authAdmin, (req, res) => {
+  const c = conversations[req.params.id];
+  if (!c) return res.status(404).send('Conversación no encontrada');
+  // Mostrar contenido solo si tus Términos lo permiten (y aplicas minimización de datos)
+  res.json({ id: c.id, messages: c.messages });
+});
 
-    // Render de una burbuja
-    function renderBubble(role, html) {
-      const isUser = role === 'user';
-      const row = document.createElement('div');
-      row.className = 'flex gap-3 items-start';
-      row.innerHTML = `
-        <div class="shrink-0 w-8 h-8 rounded-full ${isUser ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-indigo-100 dark:bg-indigo-900/40'} grid place-items-center">${isUser ? '🧑' : '🤖'}</div>
-        <div class="max-w-[85%] ${isUser ? 'bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl rounded-tr-none' : 'bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl rounded-tl-none'} p-3 text-sm leading-6 whitespace-pre-wrap">${html}</div>`;
-      $messages.appendChild(row);
-      $messages.scrollTop = $messages.scrollHeight;
-      return row.children[1]; // la burbuja
-    }
+app.post('/api/mod/conversations/:id/mute', authAdmin, (req, res) => {
+  const c = conversations[req.params.id]; if (!c) return res.status(404).send('No encontrada');
+  c.muted = true; res.json({ ok: true });
+});
 
-    // Sanitizar texto simple
-    function escapeHTML(s) {
-      return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-    }
+app.post('/api/mod/reports/:id/close', authAdmin, (req, res) => {
+  const r = reports.find(x => x.id === req.params.id); if (!r) return res.status(404).send('No encontrado');
+  r.status = 'closed'; res.json({ ok: true });
+});
 
-    // Construir contexto como texto (simple, compatible con Responses API)
-    function buildContextText() {
-      const recent = store.history.slice(-10);
-      let txt = '';
-      recent.forEach(m => { txt += (m.role === 'user' ? 'Usuario: ' : 'Asistente: ') + m.content + '\n'; });
-      return txt.trim();
-    }
+app.post('/api/mod/reports/by-conv/:id/close', authAdmin, (req, res) => {
+  const r = reports.find(x => x.conversation_id === req.params.id); if (!r) return res.status(404).send('No encontrado');
+  r.status = 'closed'; res.json({ ok: true });
+});
 
-    // Llamada con streaming usando Responses API
-    async function streamOpenAI({ userText, model }) {
-      if (!store.key) throw new Error('Falta API Key. Pulsa "Configurar clave".');
+// Restablecimiento de contraseña (seguro, sin ver contraseñas)
+app.post('/api/auth/password/reset', async (req, res) => {
+  const { email } = req.body || {};
+  // Genera token de un solo uso y envía email con enlace seguro
+  console.log(`Enviar email de reset a ${email}`);
+  res.json({ ok: true });
+});
 
-      const input = ($toggleSystem.checked ? `Instrucciones del sistema: ${SYS_PROMPT}\n\n` : '') +
-                    (store.history.length ? `Conversación previa:\n${buildContextText()}\n\n` : '') +
-                    `Usuario: ${userText}\nAsistente:`;
-
-      const resp = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${store.key}`
-        },
-        body: JSON.stringify({
-          model,
-          input,
-          stream: true,
-        })
-      });
-
-      if (!resp.ok || !resp.body) {
-        const txt = await resp.text().catch(()=> '');
-        throw new Error('Error HTTP ' + resp.status + ': ' + txt);
-      }
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      return {
-        async next(onDelta) {
-          const { value, done } = await reader.read();
-          if (done) return { done: true };
-          buffer += decoder.decode(value, { stream: true });
-
-          // La API envía Server-Sent Events (SSE) con líneas que empiezan por "data: "
-          const parts = buffer.split('\n\n');
-          buffer = parts.pop();
-
-          for (const part of parts) {
-            const line = part.trim();
-            if (!line.startsWith('data:')) continue;
-            const jsonStr = line.replace(/^data:\s*/, '');
-            if (jsonStr === '[DONE]') return { done: true };
-            try {
-              const event = JSON.parse(jsonStr);
-              // Texto incremental
-              if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
-                onDelta(event.delta);
-              }
-              // Mensaje finalizado
-              if (event.type === 'response.completed') {
-                return { done: true };
-              }
-              // Errores
-              if (event.type === 'error') {
-                throw new Error(event.error?.message || 'Error en streaming');
-              }
-            } catch (e) {
-              console.error('No se pudo parsear evento:', e, jsonStr);
-            }
-          }
-          return { done: false };
-        }
-      };
-    }
-
-    // Envío del formulario
-    $form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const text = $prompt.value.trim();
-      if (!text) return;
-
-      // Bloquear UI
-      $send.disabled = true; $prompt.disabled = true;
-
-      // Añadir mensaje del usuario
-      store.history.push({ role: 'user', content: text });
-      saveTranscript();
-      renderBubble('user', escapeHTML(text));
-      $prompt.value = ''; autoresize();
-
-      // Crear burbuja del asistente con placeholder
-      const bubble = renderBubble('assistant', '<span class="opacity-70 dots">escribiendo</span>');
-      bubble.textContent = '';
-
-      try {
-        const streamer = await streamOpenAI({ userText: text, model: $model.value });
-        let acc = '';
-        while (true) {
-          const { done } = await streamer.next((delta) => {
-            acc += delta;
-            bubble.textContent += delta;
-            $messages.scrollTop = $messages.scrollHeight;
-          });
-          if (done) break;
-        }
-        // Guardar respuesta
-        store.history.push({ role: 'assistant', content: acc });
-        saveTranscript();
-      } catch (err) {
-        console.error(err);
-        bubble.innerHTML = `<span class="text-red-600 dark:text-red-400">${escapeHTML(err.message || 'Error inesperado')}</span>`;
-      } finally {
-        $send.disabled = false; $prompt.disabled = false; $prompt.focus();
-      }
-    });
-
-    // Restaurar historial al cargar
-    loadTranscript();
-    if (store.history.length) {
-      // render previo
-      $messages.innerHTML = '';
-      for (const m of store.history) renderBubble(m.role, escapeHTML(m.content));
-    }
-  </script>
-</body>
-</html>
+app.listen(3000, () => console.log('API moderación en http://localhost:3000'));
