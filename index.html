@@ -1,91 +1,121 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Panel Admin — ECSR.io</title>
+  <meta charset="utf-8">
+  <title>ECSR.io — Página + Admin</title>
   <style>
-    body { font-family: Arial, sans-serif; background:#0f172a; color:#f1f5f9; margin:0; }
-    header { background:#1e293b; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; }
-    header h1 { font-size:18px; margin:0; }
+    body { font-family: Arial, sans-serif; background:#f1f5f9; margin:0; }
+    header { background:#1e293b; color:white; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; }
+    header h1 { margin:0; font-size:18px; }
     header button { background:#2563eb; border:none; color:white; padding:6px 12px; border-radius:6px; cursor:pointer; }
     .container { padding:20px; }
-    .card { background:#1e293b; padding:15px; border-radius:8px; margin-bottom:15px; }
+    .block { background:white; border-radius:8px; padding:15px; margin-bottom:15px; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
+    .card { background:#1e293b; padding:15px; border-radius:8px; margin-bottom:15px; color:#f1f5f9; }
     label { display:block; margin-bottom:5px; }
     input, textarea { width:100%; padding:8px; border-radius:6px; border:1px solid #334155; margin-bottom:10px; background:#0f172a; color:#f1f5f9; }
-    button.action { background:#10b981; border:none; padding:10px 15px; border-radius:6px; cursor:pointer; color:white; }
-    button.delete { background:#ef4444; }
-    #preview { margin-top:20px; }
-    .preview-item { background:#334155; padding:10px; border-radius:6px; margin-bottom:10px; }
-    .muted { font-size:12px; color:#94a3b8; }
+    button.action { background:#10b981; color:white; padding:8px 12px; border:none; border-radius:6px; cursor:pointer; }
+    button.delete { background:#ef4444; padding:6px 10px; }
     #status { margin-top:10px; font-weight:bold; }
+    .hidden { display:none; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Panel de Administración — ECSR.io</h1>
-    <button id="publishBtn">Publicar cambios</button>
+    <h1>ECSR.io</h1>
+    <button id="toggleModeBtn">🔑 Admin</button>
   </header>
-  <div class="container">
+
+  <div id="publicView" class="container">
+    <h2>Contenido público</h2>
+    <div id="mainContent"></div>
+  </div>
+
+  <div id="adminView" class="container hidden">
     <div class="card">
       <h2>Agregar Bloque</h2>
       <label>Título</label>
-      <input id="blockTitle" placeholder="Título del bloque">
+      <input id="blockTitle">
       <label>Contenido</label>
-      <textarea id="blockContent" rows="4" placeholder="Escribe el contenido..."></textarea>
-      <button class="action" id="addBlockBtn">Agregar Bloque</button>
+      <textarea id="blockContent" rows="4"></textarea>
+      <button class="action" id="addBlockBtn">Agregar</button>
     </div>
+
     <div class="card">
       <h2>Vista previa</h2>
       <div id="preview"></div>
     </div>
-    <div id="status" class="muted"></div>
+
+    <button id="publishBtn">📢 Publicar cambios</button>
+    <div id="status"></div>
   </div>
 
   <script>
-    const blocks = JSON.parse(localStorage.getItem('ecsr_blocks')||'[]');
-    const preview = document.getElementById('preview');
-    const status = document.getElementById('status');
+    // --- Data en localStorage ---
+    const STORAGE_KEY = 'ecsr_blocks';
+    let blocks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 
-    function renderBlocks(){
+    // --- Public view ---
+    function renderPublic() {
+      const container = document.getElementById('mainContent');
+      container.innerHTML = '';
+      blocks.forEach(b => {
+        const div = document.createElement('div');
+        div.className = 'block';
+        div.innerHTML = `<h2>${b.title}</h2><p>${b.content}</p>`;
+        container.appendChild(div);
+      });
+    }
+
+    // --- Admin view ---
+    function renderAdmin() {
+      const preview = document.getElementById('preview');
       preview.innerHTML = '';
       blocks.forEach((b, idx) => {
         const div = document.createElement('div');
-        div.className = 'preview-item';
-        div.innerHTML = `<h3>${b.title}</h3><p>${b.content}</p><button class="delete" onclick="deleteBlock(${idx})">Eliminar</button>`;
+        div.className = 'block';
+        div.innerHTML = `<h3>${b.title}</h3><p>${b.content}</p>
+                         <button class='delete' onclick='deleteBlock(${idx})'>Eliminar</button>`;
         preview.appendChild(div);
       });
     }
 
-    function deleteBlock(idx){
+    function deleteBlock(idx) {
       blocks.splice(idx,1);
-      localStorage.setItem('ecsr_blocks', JSON.stringify(blocks));
-      renderBlocks();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
+      renderAdmin();
+      renderPublic();
     }
 
     document.getElementById('addBlockBtn').onclick = () => {
       const title = document.getElementById('blockTitle').value.trim();
       const content = document.getElementById('blockContent').value.trim();
-      if(!title || !content){ alert('Completa título y contenido'); return; }
-      blocks.push({title, content});
-      localStorage.setItem('ecsr_blocks', JSON.stringify(blocks));
+      if (!title || !content) return alert('Completa título y contenido');
+      blocks.push({ title, content });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
       document.getElementById('blockTitle').value = '';
       document.getElementById('blockContent').value = '';
-      renderBlocks();
+      renderAdmin();
     };
 
-    document.getElementById('publishBtn').onclick = async () => {
-      status.textContent = 'Publicando...';
-      try{
-        // Simulación: en servidor real reemplazar por fetch('/api/admin/publish', {method:'POST', body:JSON.stringify(blocks), headers:{'Content-Type':'application/json'}})
-        await new Promise(r => setTimeout(r, 1000));
-        status.textContent = '✅ Cambios publicados con éxito';
-      }catch(err){
-        status.textContent = '❌ Error al publicar';
-      }
+    document.getElementById('publishBtn').onclick = () => {
+      const status = document.getElementById('status');
+      status.textContent = '✅ Cambios guardados localmente';
+      renderPublic();
     };
 
-    renderBlocks();
+    // --- Toggle entre vistas ---
+    const toggleBtn = document.getElementById('toggleModeBtn');
+    toggleBtn.onclick = () => {
+      document.getElementById('publicView').classList.toggle('hidden');
+      document.getElementById('adminView').classList.toggle('hidden');
+      toggleBtn.textContent = 
+        document.getElementById('adminView').classList.contains('hidden') 
+        ? '🔑 Admin' : '🌐 Público';
+    };
+
+    // Render inicial
+    renderPublic();
+    renderAdmin();
   </script>
 </body>
 </html>
