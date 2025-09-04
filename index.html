@@ -1,105 +1,230 @@
-// server.js
-import express from 'express';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
-import cors from 'cors';
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Consola de Seguridad — ECSR.io</title>
+<style>
+  :root{--bg:#0f172a;--card:#0b1220;--border:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--ok:#10b981;--warn:#f59e0b;--err:#ef4444}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  .card{background:linear-gradient(180deg,#0b1220,#0a0f1a);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.3);margin-bottom:16px}
+  h1,h2,h3{margin:0 0 10px} .muted{color:var(--muted);font-size:12px}
+  input,button,textarea{background:#0a0f1a;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  input,textarea{width:100%} button{cursor:pointer}
+  .row{display:grid;gap:12px} .g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:repeat(3,1fr)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .ok{background:#073a2f;border-color:#065f46} .warn{background:#3b2b07;border-color:#854d0e} .err{background:#3a0b0b;border-color:#7f1d1d}
+  .hidden{display:none} table{width:100%;border-collapse:collapse} th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+  .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .badge{padding:3px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="loginCard">
+    <h1>Acceso Admin</h1>
+    <div class="row g2">
+      <div><label>Email</label><input id="email" type="email" placeholder="admin@ecsr.io" autocomplete="username"></div>
+      <div><label>Contraseña</label><input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button id="loginBtn">Entrar</button>
+      <span class="muted">Las contraseñas jamás se muestran. Se validan con hash en el servidor.</span>
+    </div>
+    <div id="loginError" class="muted" style="color:#fca5a5;margin-top:8px"></div>
+  </div>
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+  <div class="card hidden" id="panelCard">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Consola de Seguridad</h2>
+      <div class="actions">
+        <button id="refreshBtn">Actualizar</button>
+        <button id="logoutBtn">Salir</button>
+      </div>
+    </div>
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cambia-esto';
-const ADMIN_USERS = [
-  // Hash generado con: bcrypt.hash('TuPassFuerte123', 12)
-  { id: 'admin-1', email: 'admin@ecsr.io', passwordHash: '$2b$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', role: 'admin' }
-];
+    <div class="kpi" style="margin-top:12px">
+      <div class="card"><div class="muted">Usuarios activos</div><div id="kpiUsers" style="font-size:22px">—</div></div>
+      <div class="card"><div class="muted">Reportes abiertos</div><div id="kpiReports" style="font-size:22px">—</div></div>
+      <div class="card"><div class="muted">Sesiones activas</div><div id="kpiSessions" style="font-size:22px">—</div></div>
+      <div class="card"><div class="muted">Baneos 24h</div><div id="kpiBans" style="font-size:22px">—</div></div>
+    </div>
 
-// Simulaciones de datos
-const users = [
-  { id: 'u1', username: 'mateo', status: 'ok', open_reports: 0 },
-  { id: 'u2', username: 'userX', status: 'warned', open_reports: 2 }
-];
+    <div class="card" style="margin-top:16px">
+      <h3>Buscar usuario</h3>
+      <div class="row g3">
+        <input id="qUser" placeholder="usuario o id">
+        <button id="btnView">Ver</button>
+        <button id="btnBlock" class="err">Bloquear</button>
+      </div>
+      <div id="userInfo" class="muted" style="margin-top:8px"></div>
+      <div class="actions" style="margin-top:8px">
+        <button id="btnLogoutAll" class="warn">Revocar sesiones</button>
+        <button id="btnForceReset" class="warn">Forzar reset por email</button>
+        <button id="btnSetTemp" class="ok">Establecer contraseña temporal</button>
+        <button id="btnEnable2FA" class="ok">Forzar 2FA</button>
+        <button id="btnUnblock">Desbloquear</button>
+      </div>
+      <div id="tempPw" class="muted" style="margin-top:8px"></div>
+    </div>
 
-const reports = [
-  { id: 'r1', reporter_username: 'mateo', reported_username: 'userX', reported_id: 'u2', reason: 'acoso', status: 'open', conversation_id: 'c42' }
-];
+    <div class="card" style="margin-top:16px">
+      <h3>Reportes y DMs</h3>
+      <table id="tblReports">
+        <thead><tr><th>ID</th><th>Reportado</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
-const conversations = {
-  'c42': { id: 'c42', messages: [
-    { ts: Date.now()-600000, from: 'mateo', text: 'hola' },
-    { ts: Date.now()-590000, from: 'userX', text: 'mensaje cuestionable' }
-  ], muted: false }
-};
+    <div class="card" style="margin-top:16px">
+      <h3>Auditoría</h3>
+      <table id="tblAudit">
+        <thead><tr><th>Fecha</th><th>Admin</th><th>Acción</th><th>Detalle</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-// Middleware auth
-function authAdmin(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.replace(/^Bearer /, '');
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.role !== 'admin') return res.status(403).send('Forbidden');
-    req.admin = payload; next();
-  } catch {
-    return res.status(401).send('Unauthorized');
+<script>
+(() => {
+  let token = null;
+  const $ = s => document.querySelector(s);
+
+  async function api(path, options = {}) {
+    const headers = { 'Content-Type':'application/json', ...(options.headers||{}) };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(path, { ...options, headers });
+    if (!res.ok) throw new Error((await res.text()) || res.statusText);
+    const ct = res.headers.get('content-type') || '';
+    return ct.includes('application/json') ? res.json() : res.text();
   }
-}
 
-// Auth
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body || {};
-  const admin = ADMIN_USERS.find(a => a.email === email);
-  if (!admin) return res.status(401).send('Credenciales inválidas');
-  const ok = await bcrypt.compare(password, admin.passwordHash);
-  if (!ok) return res.status(401).send('Credenciales inválidas');
-  const token = jwt.sign({ sub: admin.id, role: 'admin', email }, JWT_SECRET, { expiresIn: '2h' });
-  res.json({ token });
-});
+  const loginCard = $('#loginCard'), panelCard = $('#panelCard');
 
-// Moderación
-app.get('/api/mod/reports', authAdmin, (req, res) => res.json(reports));
+  $('#loginBtn').addEventListener('click', async () => {
+    $('#loginError').textContent = '';
+    try {
+      const body = { email: $('#email').value.trim(), password: $('#password').value };
+      const data = await api('/api/admin/login', { method:'POST', body: JSON.stringify(body) });
+      token = data.token;
+      loginCard.classList.add('hidden');
+      panelCard.classList.remove('hidden');
+      await refreshKPIs(); await loadReports(); await loadAudit();
+    } catch (e) { $('#loginError').textContent = e.message; }
+  });
 
-app.get('/api/mod/users/:idOrName', authAdmin, (req, res) => {
-  const q = req.params.idOrName.toLowerCase();
-  const u = users.find(x => x.id === q || x.username.toLowerCase() === q);
-  if (!u) return res.status(404).send('Usuario no encontrado');
-  res.json(u); // Nota: nunca devolver hashes ni datos sensibles
-});
+  $('#logoutBtn').addEventListener('click', () => { token=null; panelCard.classList.add('hidden'); loginCard.classList.remove('hidden'); });
 
-app.post('/api/mod/ban', authAdmin, (req, res) => {
-  const { userId, reason } = req.body || {};
-  // Marca en DB y revoca tokens/sesiones
-  console.log(`BAN -> ${userId} por ${reason}`);
-  res.json({ ok: true });
-});
+  $('#refreshBtn').addEventListener('click', async () => { await refreshKPIs(); await loadReports(); await loadAudit(); });
 
-app.get('/api/mod/conversations/:id', authAdmin, (req, res) => {
-  const c = conversations[req.params.id];
-  if (!c) return res.status(404).send('Conversación no encontrada');
-  // Mostrar contenido solo si tus Términos lo permiten (y aplicas minimización de datos)
-  res.json({ id: c.id, messages: c.messages });
-});
+  async function refreshKPIs() {
+    try {
+      const k = await api('/api/admin/kpis');
+      $('#kpiUsers').textContent = k.active_users ?? '—';
+      $('#kpiReports').textContent = k.open_reports ?? '—';
+      $('#kpiSessions').textContent = k.active_sessions ?? '—';
+      $('#kpiBans').textContent = k.bans_24h ?? '—';
+    } catch(e){ console.warn(e); }
+  }
 
-app.post('/api/mod/conversations/:id/mute', authAdmin, (req, res) => {
-  const c = conversations[req.params.id]; if (!c) return res.status(404).send('No encontrada');
-  c.muted = true; res.json({ ok: true });
-});
+  $('#btnView').addEventListener('click', async () => {
+    try {
+      const q = $('#qUser').value.trim(); if (!q) return;
+      const u = await api(`/api/admin/users/${encodeURIComponent(q)}`);
+      $('#userInfo').textContent = `ID: ${u.id} · Usuario: ${u.username} · Estado: ${u.status} · 2FA: ${u.mfa_enabled ? 'ON':'OFF'} · Reportes: ${u.open_reports}`;
+    } catch(e){ $('#userInfo').textContent = e.message; }
+  });
 
-app.post('/api/mod/reports/:id/close', authAdmin, (req, res) => {
-  const r = reports.find(x => x.id === req.params.id); if (!r) return res.status(404).send('No encontrado');
-  r.status = 'closed'; res.json({ ok: true });
-});
+  $('#btnBlock').addEventListener('click', async () => {
+    const q = $('#qUser').value.trim(); if(!q) return alert('Ingresa usuario/ID');
+    if(!confirm('¿Bloquear cuenta?')) return;
+    try{ await api('/api/admin/users/block', { method:'POST', body: JSON.stringify({ userId:q }) }); alert('Cuenta bloqueada'); }
+    catch(e){ alert(e.message); }
+  });
 
-app.post('/api/mod/reports/by-conv/:id/close', authAdmin, (req, res) => {
-  const r = reports.find(x => x.conversation_id === req.params.id); if (!r) return res.status(404).send('No encontrado');
-  r.status = 'closed'; res.json({ ok: true });
-});
+  $('#btnUnblock').addEventListener('click', async () => {
+    const q = $('#qUser').value.trim(); if(!q) return;
+    try{ await api('/api/admin/users/unblock', { method:'POST', body: JSON.stringify({ userId:q }) }); alert('Cuenta desbloqueada'); }
+    catch(e){ alert(e.message); }
+  });
 
-// Restablecimiento de contraseña (seguro, sin ver contraseñas)
-app.post('/api/auth/password/reset', async (req, res) => {
-  const { email } = req.body || {};
-  // Genera token de un solo uso y envía email con enlace seguro
-  console.log(`Enviar email de reset a ${email}`);
-  res.json({ ok: true });
-});
+  $('#btnLogoutAll').addEventListener('click', async () => {
+    const q = $('#qUser').value.trim(); if(!q) return;
+    try{ await api('/api/admin/users/logout-all', { method:'POST', body: JSON.stringify({ userId:q }) }); alert('Sesiones revocadas'); }
+    catch(e){ alert(e.message); }
+  });
 
-app.listen(3000, () => console.log('API moderación en http://localhost:3000'));
+  $('#btnForceReset').addEventListener('click', async () => {
+    const q = $('#qUser').value.trim(); if(!q) return;
+    try{ await api('/api/admin/users/force-password-reset', { method:'POST', body: JSON.stringify({ userId:q }) }); alert('Reset solicitado por email'); }
+    catch(e){ alert(e.message); }
+  });
+
+  function genTempPassword(len=14){
+    const cs='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*?';
+    let p=''; crypto.getRandomValues(new Uint32Array(len)).forEach(n=>p+=cs[n%cs.length]); return p;
+  }
+
+  $('#btnSetTemp').addEventListener('click', async () => {
+    const q = $('#qUser').value.trim(); if(!q) return;
+    const temp = genTempPassword();
+    if(!confirm('Se establecerá una contraseña temporal y se pedirá cambio al iniciar sesión.')) return;
+    try {
+      await api('/api/admin/users/set-temp-password', { method:'POST', body: JSON.stringify({ userId:q, tempPassword: temp }) });
+      $('#tempPw').textContent = `Contraseña temporal generada: ${temp}  (válida 15 min, cambio obligatorio al primer login)`;
+    } catch(e){ alert(e.message); }
+  });
+
+  $('#btnEnable2FA').addEventListener('click', async () => {
+    const q = $('#qUser').value.trim(); if(!q) return;
+    try{ await api('/api/admin/users/require-2fa', { method:'POST', body: JSON.stringify({ userId:q }) }); alert('2FA requerido'); }
+    catch(e){ alert(e.message); }
+  });
+
+  async function loadReports(){
+    try{
+      const reports = await api('/api/admin/reports');
+      const tbody = $('#tblReports tbody'); tbody.innerHTML='';
+      for(const r of reports){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.id}</td>
+          <td><b>${r.reported_username}</b><br><span class="muted">por ${r.reporter_username}</span></td>
+          <td>${r.reason}</td>
+          <td><span class="badge">${r.status}</span></td>
+          <td class="actions">
+            <button data-act="open" data-id="${r.conversation_id}">Abrir</button>
+            <button data-act="mute" data-id="${r.conversation_id}" class="warn">Silenciar DM</button>
+            <button data-act="ban" data-user="${r.reported_id}" class="err">Banear</button>
+            <button data-act="close" data-id="${r.id}" class="ok">Cerrar</button>
+          </td>`;
+        tbody.appendChild(tr);
+      }
+      tbody.onclick = async (ev) => {
+        const b = ev.target.closest('button'); if(!b) return;
+        try{
+          if(b.dataset.act==='open'){ window.open(`/admin/conversations/${b.dataset.id}`,'_blank'); }
+          if(b.dataset.act==='mute'){ await api(`/api/admin/conversations/${b.dataset.id}/mute`,{method:'POST'}); alert('DM silenciado'); }
+          if(b.dataset.act==='ban'){ if(confirm('¿Banear usuario?')){ await api('/api/admin/users/ban',{method:'POST', body: JSON.stringify({ userId:b.dataset.user, reason:'Conducta en DMs'})}); alert('Usuario baneado'); } }
+          if(b.dataset.act==='close'){ await api(`/api/admin/reports/${b.dataset.id}/close`,{method:'POST'}); loadReports(); }
+        } catch(e){ alert(e.message); }
+      };
+    }catch(e){ console.warn(e); }
+  }
+
+  async function loadAudit(){
+    try{
+      const logs = await api('/api/admin/audit?limit=50');
+      const tbody = $('#tblAudit tbody'); tbody.innerHTML='';
+      for(const l of logs){
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${new Date(l.ts).toLocaleString()}</td><td>${l.admin}</td><td>${l.action}</td><td>${l.detail||''}</td>`;
+        tbody.appendChild(tr);
+      }
+    }catch(e){ /* opcional */ }
+  }
+})();
+</script>
+</body>
+</html>
