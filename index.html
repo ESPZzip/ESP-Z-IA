@@ -2,181 +2,577 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Plantilla Segura — Buenas Prácticas Web</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Content Security Policy: bloquea inline scripts/styles y orígenes no confiables -->
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests">
-  <!-- Otras políticas útiles (poner también como headers en el servidor):
-       Referrer-Policy: no enviar referrer completo a otros orígenes -->
-  <meta name="referrer" content="strict-origin-when-cross-origin">
-  <!-- Nota: Strict-Transport-Security, X-Content-Type-Options y X-Frame-Options
-       deben configurarse como headers del servidor, no via <meta>. -->
-
+  <title>ECSR.io — Panel de Administración</title>
+  <!-- Recomendado: mueve estas políticas a headers del servidor -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
   <style>
-    :root { --bg:#0f172a; --card:#0b1220; --text:#e5e7eb; --muted:#9ca3af; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --border:#1f2937; }
-    * { box-sizing: border-box }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
-    .card { background: linear-gradient(180deg,#0b1220,#0a0f1a); border:1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.3); margin: 12px 0; }
-    h1, h2 { margin: 0 0 10px }
-    label { display:block; margin-bottom: 6px }
-    input, button { background:#0a0f1a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px }
-    input { width: 100% }
-    button { cursor:pointer }
-    .muted { color: var(--muted); font-size: 12px }
-    .grid { display:grid; gap:12px; grid-template-columns: 1fr 1fr }
-    ul { margin: 8px 0 0 18px }
-    .ok { background:#073a2f; border-color:#065f46 }
-    .warn { background:#3b2b07; border-color:#854d0e }
-    .err { background:#3a0b0b; border-color:#7f1d1d }
-    code { background:#111827; padding:2px 6px; border-radius:6px; border:1px solid #1f2937 }
-    .badge { border:1px solid var(--border); border-radius:999px; padding:2px 8px; font-size:12px }
+    :root{
+      --bg:#0f172a; --card:#0b1220; --text:#e5e7eb; --muted:#9ca3af; --border:#1f2937;
+      --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --link:#60a5fa;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    a{color:var(--link);text-decoration:none}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    .card{background:linear-gradient(180deg,#0b1220,#0a0f1a);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin:12px 0}
+    h1,h2,h3{margin:0 0 10px}
+    label{display:block;margin-bottom:6px}
+    input,select,textarea,button{background:#0a0f1a;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+    input,select,textarea{width:100%}
+    textarea{min-height:120px;resize:vertical}
+    button{cursor:pointer}
+    .muted{color:var(--muted);font-size:12px}
+    .row{display:grid;gap:12px}
+    .g2{grid-template-columns:1fr 1fr}
+    .g3{grid-template-columns:repeat(3,1fr)}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .ok{background:#073a2f;border-color:#065f46}
+    .warn{background:#3b2b07;border-color:#854d0e}
+    .err{background:#3a0b0b;border-color:#7f1d1d}
+    .hidden{display:none}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+    .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .badge{border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:12px}
+    .pill{display:inline-block;padding:6px 10px;border:1px solid var(--border);border-radius:9999px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .nav{display:flex;gap:8px;flex-wrap:wrap}
+    .nav button{background:transparent;border-color:transparent;padding:8px 12px;border-radius:8px}
+    .nav button.active{background:#111827;border:1px solid var(--border)}
+    .preview{background:#0a0f1a;border:1px dashed var(--border);border-radius:12px;padding:12px;min-height:80px}
+    .grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+    .draggable{cursor:grab}
   </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="card">
-    <h1>Plantilla de Ciberseguridad (Uso Ético)</h1>
-    <p class="muted">
-      Esta página demuestra **buenas prácticas defensivas** para aplicaciones web.
-      Úsala sólo en tus propios sistemas o con autorización por escrito.
-    </p>
-    <span class="badge">CSP activo</span>
-    <span class="badge">Sin inline JS/CSS</span>
-    <span class="badge">Sin orígenes externos</span>
+  <div class="card" id="loginCard">
+    <h1>Acceso Admin — ECSR</h1>
+    <p class="muted">Inicia sesión para administrar contenido del sitio. Las contraseñas nunca se muestran; se validan en el servidor.</p>
+    <div class="row g2">
+      <div><label>Email</label><input id="email" type="email" placeholder="admin@ecsr.io" autocomplete="username"></div>
+      <div><label>Contraseña</label><input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button id="loginBtn">Entrar</button>
+      <label class="pill"><input id="demoToggle" type="checkbox"> Modo demo (sin backend)</label>
+    </div>
+    <div id="loginError" class="muted" style="color:#fca5a5;margin-top:8px"></div>
   </div>
 
-  <div class="card">
-    <h2>Formulario Seguro (con señales de CSRF & 2FA)</h2>
-    <p class="muted">Ejemplo de UI: jamás muestra contraseñas; ilustra flags de seguridad.</p>
-    <form id="secureForm" method="POST" action="/account/update" autocomplete="off">
-      <div class="grid">
-        <div>
-          <label for="displayName">Nombre para mostrar</label>
-          <input id="displayName" name="displayName" maxlength="40" placeholder="Tu nombre" required>
-        </div>
-        <div>
-          <label for="email">Correo</label>
-          <input id="email" name="email" type="email" inputmode="email" autocomplete="email" required>
-        </div>
-      </div>
-
-      <!-- Campo de contraseña: no se muestra la actual; sólo cambio con confirmación -->
-      <div class="grid" style="margin-top:12px">
-        <div>
-          <label for="newPw">Nueva contraseña (opcional)</label>
-          <input id="newPw" name="newPw" type="password" minlength="12" autocomplete="new-password"
-                 placeholder="Mínimo 12 caracteres">
-        </div>
-        <div>
-          <label for="newPw2">Confirmar contraseña</label>
-          <input id="newPw2" name="newPw2" type="password" minlength="12" autocomplete="new-password">
-        </div>
-      </div>
-
-      <!-- Indicador de 2FA -->
-      <div style="margin-top:12px">
-        <label><input type="checkbox" id="require2fa"> Requerir 2FA para inicio de sesión</label>
-      </div>
-
-      <!-- Token CSRF: el backend debe emitirlo y validarlo -->
-      <input type="hidden" id="csrf" name="csrf" value="<!-- inyecta token del servidor -->">
-
-      <div style="margin-top:12px">
-        <button type="submit" class="ok">Guardar cambios</button>
-      </div>
-      <p id="msg" class="muted" style="margin-top:8px"></p>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>Saneo de Entrada (cliente) — demostración</h2>
-    <p class="muted">
-      El saneo **servidor** es lo principal. Esto es un refuerzo visual en cliente:
-      elimina etiquetas peligrosas y atributos de eventos antes de mostrar contenido.
-    </p>
-    <div class="grid">
+  <div class="card hidden" id="panelCard">
+    <div style="display:flex;justify-content:space-between;align-items:center">
       <div>
-        <label for="userInput">Contenido del usuario (ej. bio, comentarios)</label>
-        <input id="userInput" placeholder="Escribe texto; se filtrarán etiquetas no seguras">
-        <button id="previewBtn" style="margin-top:8px">Previsualizar seguro</button>
+        <h2>Panel de Administración</h2>
+        <div class="muted">Gestiona contenido, navegación y anuncios del home en ecsr.io</div>
       </div>
-      <div>
-        <label>Vista segura</label>
-        <div id="preview" style="min-height:48px; padding:10px; border:1px dashed #1f2937; border-radius:10px"></div>
+      <div class="toolbar">
+        <button id="refreshBtn">Actualizar</button>
+        <button id="logoutBtn">Salir</button>
       </div>
     </div>
-  </div>
 
-  <div class="card">
-    <h2>Checklist de Seguridad Web</h2>
-    <ul>
-      <li><strong>HTTPS + HSTS</strong> (header <code>Strict-Transport-Security</code> en el servidor).</li>
-      <li><strong>CSP estricta</strong> (sin <code>'unsafe-inline'</code>, sin orígenes externos innecesarios).</li>
-      <li><strong>Protecciones básicas</strong>: <code>X-Content-Type-Options: nosniff</code>, <code>X-Frame-Options: DENY</code> o <code>frame-ancestors</code> en CSP, <code>Referrer-Policy</code>.</li>
-      <li><strong>Autenticación</strong>: passwords hasheadas con Argon2id/bcrypt (coste alto) + 2FA opcional/obligatorio según riesgo.</li>
-      <li><strong>CSRF</strong>: tokens por sesión + validación de origen + SameSite cookies.</li>
-      <li><strong>Validación</strong> en servidor (tipo, longitud, listas blancas) y sanitización de salida (escapar HTML).</li>
-      <li><strong>Gestión de sesión</strong>: expiración corta, revocación en logout, rotación de tokens.</li>
-      <li><strong>Registro/Auditoría</strong> de acciones sensibles, alertas de login, detección de anomalías.</li>
-      <li><strong>Rate limiting</strong>, bloqueo incremental y CAPTCHA en endpoints de autenticación.</li>
-      <li><strong>Backups cifrados</strong> y secretos en un gestor (no en repositorios).</li>
-    </ul>
-  </div>
+    <div class="kpi" style="margin-top:12px">
+      <div class="card"><div class="muted">Bloques publicados</div><div id="kpiBlocks" style="font-size:22px">—</div></div>
+      <div class="card"><div class="muted">Borradores</div><div id="kpiDrafts" style="font-size:22px">—</div></div>
+      <div class="card"><div class="muted">Anuncios activos</div><div id="kpiBanners" style="font-size:22px">—</div></div>
+      <div class="card"><div class="muted">Última publicación</div><div id="kpiLast" style="font-size:22px">—</div></div>
+    </div>
 
-  <div class="card">
-    <h2>Marco Ético y Legal</h2>
-    <p class="muted">
-      Realiza pruebas sólo con <strong>autorización por escrito</strong>, define alcance, ventanas de tiempo y reglas de reporte.
-      Usa canales de <em>responsible disclosure</em>. Nunca ataques sistemas ajenos.
-    </p>
+    <div class="card" style="margin-top:16px">
+      <div class="nav" id="tabs">
+        <button data-tab="content" class="active">Contenido</button>
+        <button data-tab="navigation">Navegación</button>
+        <button data-tab="banners">Anuncios</button>
+        <button data-tab="media">Media</button>
+        <button data-tab="settings">Ajustes</button>
+      </div>
+    </div>
+
+    <!-- TAB: CONTENIDO -->
+    <div class="card tab" id="tab-content">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Bloques de contenido</h3>
+        <div class="toolbar">
+          <button id="newBlockBtn" class="ok">Nuevo bloque</button>
+          <button id="publishOrderBtn" class="warn">Guardar orden</button>
+        </div>
+      </div>
+      <div id="blocksList" class="grid-cards" style="margin-top:12px"></div>
+    </div>
+
+    <!-- TAB: NAVEGACIÓN -->
+    <div class="card tab hidden" id="tab-navigation">
+      <h3>Enlaces de navegación</h3>
+      <div class="row g3" style="margin-top:8px">
+        <input id="navLabel" placeholder="Etiqueta (p.ej. Marketplace)">
+        <input id="navHref" placeholder="URL (p.ej. /market)">
+        <button id="addNavBtn" class="ok">Agregar</button>
+      </div>
+      <table style="margin-top:12px"><thead><tr><th>Etiqueta</th><th>URL</th><th>Orden</th><th>Acciones</th></tr></thead><tbody id="navTable"></tbody></table>
+    </div>
+
+    <!-- TAB: BANNERS -->
+    <div class="card tab hidden" id="tab-banners">
+      <h3>Anuncios / Banners</h3>
+      <div class="row g2" style="margin-top:8px">
+        <div>
+          <label>Título</label>
+          <input id="banTitle" placeholder="Título del banner">
+          <label>Imagen (URL)</label>
+          <input id="banImage" placeholder="https://...">
+          <label>Enlace (opcional)</label>
+          <input id="banLink" placeholder="https://... o /ruta">
+          <label><input id="banActive" type="checkbox"> Activo</label>
+          <div class="actions" style="margin-top:8px"><button id="addBanBtn" class="ok">Crear banner</button></div>
+        </div>
+        <div>
+          <label>Previsualización</label>
+          <div id="banPreview" class="preview">—</div>
+        </div>
+      </div>
+      <table style="margin-top:12px"><thead><tr><th>Imagen</th><th>Título</th><th>Link</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="banTable"></tbody></table>
+    </div>
+
+    <!-- TAB: MEDIA -->
+    <div class="card tab hidden" id="tab-media">
+      <h3>Biblioteca de Media (por URL)</h3>
+      <div class="row g3" style="margin-top:8px">
+        <input id="mediaUrl" placeholder="https://...">
+        <input id="mediaAlt" placeholder="Descripción/alt">
+        <button id="addMediaBtn" class="ok">Agregar</button>
+      </div>
+      <div id="mediaGrid" class="grid-cards" style="margin-top:12px"></div>
+    </div>
+
+    <!-- TAB: AJUSTES -->
+    <div class="card tab hidden" id="tab-settings">
+      <h3>Configuración</h3>
+      <div class="row g2" style="margin-top:8px">
+        <div>
+          <label>Entorno</label>
+          <select id="env">
+            <option value="prod">Producción</option>
+            <option value="staging">Staging</option>
+            <option value="dev">Desarrollo</option>
+          </select>
+        </div>
+        <div>
+          <label>Publicación</label>
+          <button id="publishSiteBtn" class="warn">Publicar cambios</button>
+        </div>
+      </div>
+      <p class="muted">Al publicar, los cambios de contenido y navegación se envían al backend de ecsr.io para que se reflejen en el sitio.</p>
+    </div>
   </div>
 </div>
 
 <script>
-/* Validaciones de formulario y saneo básico en cliente (además del servidor) */
-(function(){
-  const $ = s => document.querySelector(s);
-  const msg = $('#msg');
+(() => {
+  let token = null;
+  let demo = false; // Modo sin backend
 
-  // Saneo: elimina tags y atributos riesgosos; ejemplo mínimo.
-  function sanitize(input) {
-    const tmp = document.createElement('div');
-    tmp.textContent = input; // encode por defecto (escapa HTML)
-    // Si quisieras permitir un subconjunto de etiquetas, implementar una whitelist aquí.
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+
+  // ---- API Helper ---------------------------------------------------------
+  async function api(path, options={}){
+    if(demo) return demoApi(path, options);
+    const headers = { 'Content-Type':'application/json', ...(options.headers||{}) };
+    if(token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(path, { ...options, headers });
+    if(!res.ok) throw new Error((await res.text()) || res.statusText);
+    const ct = res.headers.get('content-type')||'';
+    return ct.includes('application/json') ? res.json() : res.text();
+  }
+
+  // ---- DEMO API (localStorage) -------------------------------------------
+  function ls(k, v){ if(v===undefined){ return JSON.parse(localStorage.getItem(k)||'null'); } localStorage.setItem(k, JSON.stringify(v)); return v; }
+  async function demoApi(path, options={}){
+    const method = (options.method||'GET').toUpperCase();
+    const body = options.body ? JSON.parse(options.body) : null;
+    const db = ls('ECSR_ADMIN_DB') || { blocks:[], nav:[], banners:[], media:[], lastPublish:null };
+
+    // Auth
+    if(path==='/api/admin/login' && method==='POST') return { token: 'demo-token' };
+
+    // KPIs
+    if(path==='/api/admin/kpis' && method==='GET'){
+      const k = { active_blocks: db.blocks.filter(b=>b.published).length, drafts: db.blocks.filter(b=>!b.published).length, banners: db.banners.filter(b=>b.active).length, last_publish: db.lastPublish };
+      return { active_blocks: k.active_blocks, drafts: k.drafts, banners: k.banners, last_publish: k.last_publish };
+    }
+
+    // Blocks
+    if(path==='/api/admin/blocks' && method==='GET') return db.blocks.sort((a,b)=>a.position-b.position);
+    if(path==='/api/admin/blocks' && method==='POST'){
+      const id = crypto.randomUUID();
+      const block = { id, title: body.title, type: body.type, content: body.content, image: body.image||'', link: body.link||'', position: db.blocks.length, published: !!body.published };
+      db.blocks.push(block); ls('ECSR_ADMIN_DB', db); return block;
+    }
+    if(path.startsWith('/api/admin/blocks/') && method==='PUT'){
+      const id = path.split('/').pop(); const i = db.blocks.findIndex(x=>x.id===id); if(i<0) throw new Error('No existe');
+      db.blocks[i] = { ...db.blocks[i], ...body }; ls('ECSR_ADMIN_DB', db); return db.blocks[i];
+    }
+    if(path.startsWith('/api/admin/blocks/') && method==='DELETE'){
+      const id = path.split('/').pop(); const i = db.blocks.findIndex(x=>x.id===id); if(i<0) throw new Error('No existe');
+      db.blocks.splice(i,1); db.blocks.forEach((b,idx)=>b.position=idx); ls('ECSR_ADMIN_DB', db); return { ok:true };
+    }
+    if(path==='/api/admin/blocks/reorder' && method==='POST'){
+      const ids = body.ids; const map = new Map(ids.map((id,idx)=>[id,idx]));
+      db.blocks.forEach(b=>b.position = map.get(b.id)); db.blocks.sort((a,b)=>a.position-b.position); ls('ECSR_ADMIN_DB', db); return { ok:true };
+    }
+
+    // Nav
+    if(path==='/api/admin/nav' && method==='GET') return db.nav;
+    if(path==='/api/admin/nav' && method==='POST'){
+      const item = { id: crypto.randomUUID(), label: body.label, href: body.href, order: db.nav.length };
+      db.nav.push(item); ls('ECSR_ADMIN_DB', db); return item;
+    }
+    if(path.startsWith('/api/admin/nav/') && method==='PUT'){
+      const id = path.split('/').pop(); const i = db.nav.findIndex(x=>x.id===id); if(i<0) throw new Error('No existe');
+      db.nav[i] = { ...db.nav[i], ...body }; ls('ECSR_ADMIN_DB', db); return db.nav[i];
+    }
+    if(path.startsWith('/api/admin/nav/') && method==='DELETE'){
+      const id = path.split('/').pop(); const i = db.nav.findIndex(x=>x.id===id); if(i<0) throw new Error('No existe');
+      db.nav.splice(i,1); db.nav.forEach((n,idx)=>n.order=idx); ls('ECSR_ADMIN_DB', db); return { ok:true };
+    }
+
+    // Banners
+    if(path==='/api/admin/banners' && method==='GET') return db.banners;
+    if(path==='/api/admin/banners' && method==='POST'){
+      const ban = { id: crypto.randomUUID(), title: body.title, image: body.image, link: body.link||'', active: !!body.active };
+      db.banners.push(ban); ls('ECSR_ADMIN_DB', db); return ban;
+    }
+    if(path.startsWith('/api/admin/banners/') && method==='PUT'){
+      const id = path.split('/').pop(); const i = db.banners.findIndex(x=>x.id===id); if(i<0) throw new Error('No existe');
+      db.banners[i] = { ...db.banners[i], ...body }; ls('ECSR_ADMIN_DB', db); return db.banners[i];
+    }
+    if(path.startsWith('/api/admin/banners/') && method==='DELETE'){
+      const id = path.split('/').pop(); const i = db.banners.findIndex(x=>x.id===id); if(i<0) throw new Error('No existe');
+      db.banners.splice(i,1); ls('ECSR_ADMIN_DB', db); return { ok:true };
+    }
+
+    // Media
+    if(path==='/api/admin/media' && method==='GET') return db.media;
+    if(path==='/api/admin/media' && method==='POST'){
+      const m = { id: crypto.randomUUID(), url: body.url, alt: body.alt||'' };
+      db.media.push(m); ls('ECSR_ADMIN_DB', db); return m;
+    }
+    if(path.startsWith('/api/admin/media/') && method==='DELETE'){
+      const id = path.split('/').pop(); const i = db.media.findIndex(x=>x.id===id); if(i<0) throw new Error('No existe');
+      db.media.splice(i,1); ls('ECSR_ADMIN_DB', db); return { ok:true };
+    }
+
+    // Publish
+    if(path==='/api/admin/publish' && method==='POST'){
+      db.lastPublish = new Date().toISOString(); ls('ECSR_ADMIN_DB', db); return { ok:true, at: db.lastPublish };
+    }
+
+    throw new Error('Ruta demo no implementada: '+method+' '+path);
+  }
+
+  // ---- UI Helpers ---------------------------------------------------------
+  function toast(msg){ alert(msg); }
+  function sanitizeAdminHtml(s){
+    // Permitir un subconjunto muy básico para admins: <b><i><u><br><p><ul><ol><li><a><strong><em>
+    const tmp = document.createElement('div'); tmp.innerHTML = s;
+    const allowed = new Set(['B','I','U','BR','P','UL','OL','LI','A','STRONG','EM']);
+    (function walk(node){
+      [...node.childNodes].forEach(n=>{
+        if(n.nodeType===1){ // Element
+          if(!allowed.has(n.tagName)) { const t = document.createTextNode(n.textContent); n.replaceWith(t); }
+          else { // Limpia atributos peligrosos
+            [...n.attributes].forEach(a=>{ if(!['href'].includes(a.name)) n.removeAttribute(a.name); });
+            walk(n);
+          }
+        }
+      });
+    })(tmp);
     return tmp.innerHTML;
   }
 
-  $('#previewBtn').addEventListener('click', () => {
-    const safe = sanitize($('#userInput').value);
-    $('#preview').innerHTML = safe;
+  // ---- Auth Flow ----------------------------------------------------------
+  $('#demoToggle').addEventListener('change', (e)=>{ demo = e.target.checked; });
+  $('#loginBtn').addEventListener('click', async ()=>{
+    $('#loginError').textContent='';
+    try{
+      const res = await api('/api/admin/login',{ method:'POST', body: JSON.stringify({ email: $('#email').value.trim(), password: $('#password').value }) });
+      token = res.token;
+      $('#loginCard').classList.add('hidden');
+      $('#panelCard').classList.remove('hidden');
+      await refreshAll();
+    }catch(e){ $('#loginError').textContent = e.message; }
+  });
+  $('#logoutBtn').addEventListener('click', ()=>{ token=null; $('#panelCard').classList.add('hidden'); $('#loginCard').classList.remove('hidden'); });
+
+  $('#refreshBtn').addEventListener('click', refreshAll);
+
+  async function refreshAll(){ await refreshKPIs(); await loadBlocks(); await loadNav(); await loadBanners(); await loadMedia(); }
+
+  async function refreshKPIs(){
+    try{
+      const k = await api('/api/admin/kpis');
+      $('#kpiBlocks').textContent = k.active_blocks ?? '—';
+      $('#kpiDrafts').textContent = k.drafts ?? '—';
+      $('#kpiBanners').textContent = k.banners ?? '—';
+      $('#kpiLast').textContent = k.last_publish ? new Date(k.last_publish).toLocaleString() : '—';
+    }catch(e){ console.warn(e); }
+  }
+
+  // ---- Tabs ---------------------------------------------------------------
+  $('#tabs').addEventListener('click', (ev)=>{
+    const btn = ev.target.closest('button'); if(!btn) return;
+    $$('#tabs button').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+    const tab = btn.dataset.tab; $$('.tab').forEach(t=>t.classList.add('hidden')); $('#tab-'+tab).classList.remove('hidden');
   });
 
-  $('#secureForm').addEventListener('submit', (e) => {
-    e.preventDefault();
+  // ---- Blocks (Contenido) -------------------------------------------------
+  $('#newBlockBtn').addEventListener('click', ()=> openBlockEditor());
 
-    // Verifica contraseñas (si usuario decidió cambiarlas)
-    const pw1 = $('#newPw').value;
-    const pw2 = $('#newPw2').value;
-    if (pw1 || pw2) {
-      if (pw1.length < 12) { msg.textContent = 'La nueva contraseña debe tener al menos 12 caracteres.'; return; }
-      if (pw1 !== pw2) { msg.textContent = 'Las contraseñas no coinciden.'; return; }
-    }
+  async function loadBlocks(){
+    try{
+      const blocks = await api('/api/admin/blocks');
+      const list = $('#blocksList'); list.innerHTML='';
+      for(const b of blocks){ list.appendChild(renderBlockCard(b)); }
+      makeBlocksDraggable();
+    }catch(e){ console.warn(e); }
+  }
 
-    // Señal de 2FA
-    const require2fa = $('#require2fa').checked;
-
-    // Envío simulado: en producción usar fetch() a tu backend, con token CSRF válido
-    msg.textContent = 'Datos validados en cliente. Enviar al servidor con validaciones y headers de seguridad.';
-    console.log({
-      displayName: $('#displayName').value.trim(),
-      email: $('#email').value.trim(),
-      newPw: pw1 ? '[NO ENVIAR EN LOGS]' : null,
-      require2fa,
-      csrf: $('#csrf').value
+  function renderBlockCard(b){
+    const el = document.createElement('div'); el.className='card draggable'; el.draggable=true; el.dataset.id=b.id;
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:600">${b.title}</div>
+          <div class="muted">Tipo: ${b.type} · Orden: ${b.position} · ${b.published?'<span class="badge">Publicado</span>':'<span class="badge">Borrador</span>'}</div>
+        </div>
+        <div class="actions">
+          <button data-act="edit">Editar</button>
+          <button data-act="toggle" class="warn">${b.published?'Despublicar':'Publicar'}</button>
+          <button data-act="delete" class="err">Eliminar</button>
+        </div>
+      </div>
+      ${b.image?`<img src="${b.image}" alt="" style="width:100%;margin-top:8px;border-radius:12px">`:''}
+      <div class="preview" style="margin-top:8px">${b.content}</div>
+    `;
+    el.addEventListener('click', async (ev)=>{
+      const btn = ev.target.closest('button'); if(!btn) return;
+      const act = btn.dataset.act;
+      if(act==='edit') openBlockEditor(b);
+      if(act==='toggle') { await api(`/api/admin/blocks/${b.id}`,{method:'PUT', body: JSON.stringify({ published: !b.published })}); await loadBlocks(); await refreshKPIs(); }
+      if(act==='delete') { if(confirm('¿Eliminar bloque?')){ await api(`/api/admin/blocks/${b.id}`,{method:'DELETE'}); await loadBlocks(); await refreshKPIs(); } }
     });
+    return el;
+  }
+
+  function openBlockEditor(data){
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+      <div class="card" style="position:fixed;inset:0;max-width:720px;margin:40px auto;background:#0b1220;z-index:50">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3>${data?'Editar':'Nuevo'} bloque</h3>
+          <button id="closeModal">×</button>
+        </div>
+        <div class="row g2" style="margin-top:8px">
+          <div>
+            <label>Título</label>
+            <input id="blkTitle" placeholder="Título" value="${data?.title||''}">
+            <label>Tipo</label>
+            <select id="blkType">
+              <option value="card" ${data?.type==='card'?'selected':''}>Tarjeta</option>
+              <option value="banner" ${data?.type==='banner'?'selected':''}>Banner</option>
+              <option value="section" ${data?.type==='section'?'selected':''}>Sección</option>
+            </select>
+            <label>Imagen (opcional)</label>
+            <input id="blkImage" placeholder="https://..." value="${data?.image||''}">
+            <label>Enlace (opcional)</label>
+            <input id="blkLink" placeholder="/ruta o https://..." value="${data?.link||''}">
+            <label><input id="blkPublished" type="checkbox" ${data?.published?'checked':''}> Publicado</label>
+            <div class="actions" style="margin-top:8px">
+              <button id="saveBlock" class="ok">Guardar</button>
+            </div>
+          </div>
+          <div>
+            <label>Contenido (HTML básico permitido)</label>
+            <textarea id="blkContent" placeholder="<p>Texto...</p>">${data?.content||''}</textarea>
+            <label>Previsualización</label>
+            <div id="blkPreview" class="preview">${data?.content||'—'}</div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#closeModal').onclick = ()=> modal.remove();
+    const upd = ()=> modal.querySelector('#blkPreview').innerHTML = sanitizeAdminHtml(modal.querySelector('#blkContent').value);
+    modal.querySelector('#blkContent').addEventListener('input', upd); upd();
+
+    modal.querySelector('#saveBlock').addEventListener('click', async ()=>{
+      const payload = {
+        title: modal.querySelector('#blkTitle').value.trim(),
+        type: modal.querySelector('#blkType').value,
+        content: sanitizeAdminHtml(modal.querySelector('#blkContent').value),
+        image: modal.querySelector('#blkImage').value.trim(),
+        link: modal.querySelector('#blkLink').value.trim(),
+        published: modal.querySelector('#blkPublished').checked
+      };
+      try{
+        if(data){ await api(`/api/admin/blocks/${data.id}`, { method:'PUT', body: JSON.stringify(payload) }); }
+        else { await api('/api/admin/blocks', { method:'POST', body: JSON.stringify(payload) }); }
+        modal.remove(); await loadBlocks(); await refreshKPIs();
+      }catch(e){ toast(e.message); }
+    });
+  }
+
+  function makeBlocksDraggable(){
+    const container = $('#blocksList');
+    let dragEl = null;
+    container.addEventListener('dragstart', (e)=>{ dragEl = e.target.closest('.draggable'); });
+    container.addEventListener('dragover', (e)=>{
+      e.preventDefault();
+      const after = getDragAfterElement(container, e.clientY);
+      if(after==null) container.appendChild(dragEl); else container.insertBefore(dragEl, after);
+    });
+    container.addEventListener('drop', async ()=>{
+      const ids = [...container.querySelectorAll('.draggable')].map(x=>x.dataset.id);
+      try{ await api('/api/admin/blocks/reorder',{method:'POST', body: JSON.stringify({ ids })}); await loadBlocks(); }
+      catch(e){ toast(e.message); }
+    });
+  }
+  function getDragAfterElement(container, y){
+    const els = [...container.querySelectorAll('.draggable:not(.dragging)')];
+    return els.reduce((closest, child)=>{
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height/2;
+      if(offset < 0 && offset > closest.offset){ return { offset, element: child }; }
+      else return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  // ---- Navigation ---------------------------------------------------------
+  async function loadNav(){
+    try{
+      const nav = await api('/api/admin/nav');
+      const tbody = $('#navTable'); tbody.innerHTML='';
+      for(const n of nav){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><input data-k="label" value="${n.label}"></td>
+                        <td><input data-k="href" value="${n.href}"></td>
+                        <td><input data-k="order" type="number" value="${n.order}" style="width:80px"></td>
+                        <td class="actions">
+                          <button data-act="save">Guardar</button>
+                          <button data-act="del" class="err">Eliminar</button>
+                        </td>`;
+        tr.addEventListener('click', async (ev)=>{
+          const b = ev.target.closest('button'); if(!b) return;
+          if(b.dataset.act==='save'){
+            const label = tr.querySelector('input[data-k="label"]').value.trim();
+            const href = tr.querySelector('input[data-k="href"]').value.trim();
+            const order = parseInt(tr.querySelector('input[data-k="order"]').value,10)||0;
+            await api(`/api/admin/nav/${n.id}`,{method:'PUT', body: JSON.stringify({ label, href, order })});
+            await loadNav();
+          }
+          if(b.dataset.act==='del'){
+            if(confirm('¿Eliminar enlace?')){ await api(`/api/admin/nav/${n.id}`,{method:'DELETE'}); await loadNav(); }
+          }
+        });
+        tbody.appendChild(tr);
+      }
+    }catch(e){ console.warn(e); }
+  }
+  $('#addNavBtn').addEventListener('click', async ()=>{
+    const label = $('#navLabel').value.trim(); const href = $('#navHref').value.trim(); if(!label||!href) return toast('Completa etiqueta y URL');
+    try{ await api('/api/admin/nav',{method:'POST', body: JSON.stringify({ label, href })}); $('#navLabel').value=''; $('#navHref').value=''; await loadNav(); }
+    catch(e){ toast(e.message); }
   });
+
+  // ---- Banners ------------------------------------------------------------
+  $('#banTitle').addEventListener('input', updateBanPreview);
+  $('#banImage').addEventListener('input', updateBanPreview);
+  $('#banLink').addEventListener('input', updateBanPreview);
+  $('#banActive').addEventListener('change', updateBanPreview);
+  function updateBanPreview(){
+    const t = $('#banTitle').value.trim(); const img = $('#banImage').value.trim(); const link = $('#banLink').value.trim(); const active = $('#banActive').checked;
+    const html = `<div style="display:flex;gap:12px;align-items:center">
+                    ${img?`<img src="${img}" alt="" style="height:56px;border-radius:8px">`:''}
+                    <div><div style="font-weight:600">${t||'Sin título'}</div>
+                    <div class="muted">${active?'Activo':'Inactivo'} ${link?`· <a href="${link}">${link}</a>`:''}</div></div>
+                  </div>`;
+    $('#banPreview').innerHTML = html;
+  }
+  $('#addBanBtn').addEventListener('click', async ()=>{
+    const title = $('#banTitle').value.trim(); const image = $('#banImage').value.trim(); if(!title||!image) return toast('Título e imagen son obligatorios');
+    try{
+      const link = $('#banLink').value.trim(); const active = $('#banActive').checked;
+      await api('/api/admin/banners',{method:'POST', body: JSON.stringify({ title, image, link, active })});
+      $('#banTitle').value=''; $('#banImage').value=''; $('#banLink').value=''; $('#banActive').checked=false; updateBanPreview();
+      await loadBanners(); await refreshKPIs();
+    }catch(e){ toast(e.message); }
+  });
+  async function loadBanners(){
+    try{
+      const bans = await api('/api/admin/banners');
+      const tbody = $('#banTable'); tbody.innerHTML='';
+      for(const b of bans){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${b.image?`<img src="${b.image}" alt="" style="height:42px;border-radius:6px">`:''}</td>
+                        <td>${b.title}</td>
+                        <td>${b.link?`<a href="${b.link}">${b.link}</a>`:'—'}</td>
+                        <td>${b.active?'<span class="badge">Activo</span>':'—'}</td>
+                        <td class="actions">
+                          <button data-act="toggle" class="warn">${b.active?'Desactivar':'Activar'}</button>
+                          <button data-act="del" class="err">Eliminar</button>
+                        </td>`;
+        tr.addEventListener('click', async (ev)=>{
+          const btn = ev.target.closest('button'); if(!btn) return;
+          if(btn.dataset.act==='toggle'){ await api(`/api/admin/banners/${b.id}`,{method:'PUT', body: JSON.stringify({ active: !b.active })}); await loadBanners(); await refreshKPIs(); }
+          if(btn.dataset.act==='del'){ if(confirm('¿Eliminar banner?')){ await api(`/api/admin/banners/${b.id}`,{method:'DELETE'}); await loadBanners(); await refreshKPIs(); } }
+        });
+        tbody.appendChild(tr);
+      }
+    }catch(e){ console.warn(e); }
+  }
+
+  // ---- Media --------------------------------------------------------------
+  $('#addMediaBtn').addEventListener('click', async ()=>{
+    const url = $('#mediaUrl').value.trim(); if(!url) return toast('URL requerida');
+    try{
+      const alt = $('#mediaAlt').value.trim();
+      await api('/api/admin/media',{method:'POST', body: JSON.stringify({ url, alt })});
+      $('#mediaUrl').value=''; $('#mediaAlt').value=''; await loadMedia();
+    }catch(e){ toast(e.message); }
+  });
+  async function loadMedia(){
+    try{
+      const media = await api('/api/admin/media');
+      const grid = $('#mediaGrid'); grid.innerHTML='';
+      for(const m of media){
+        const card = document.createElement('div'); card.className='card';
+        card.innerHTML = `<img src="${m.url}" alt="${m.alt||''}" style="width:100%;border-radius:12px;max-height:180px;object-fit:cover">
+                          <div style="margin-top:6px">${m.alt||'Sin descripción'}</div>
+                          <div class="muted" style="word-break:break-all">${m.url}</div>
+                          <div class="actions" style="margin-top:8px"><button data-act="del" class="err">Eliminar</button></div>`;
+        card.addEventListener('click', async (ev)=>{
+          if(ev.target.closest('button')?.dataset.act==='del'){
+            if(confirm('¿Eliminar media?')){ await api(`/api/admin/media/${m.id}`,{method:'DELETE'}); await loadMedia(); }
+          }
+        });
+        grid.appendChild(card);
+      }
+    }catch(e){ console.warn(e); }
+  }
+
+  // ---- Settings / Publish -------------------------------------------------
+  $('#publishSiteBtn').addEventListener('click', async ()=>{
+    if(!confirm('¿Publicar cambios al sitio?')) return;
+    try{
+      const res = await api('/api/admin/publish',{method:'POST', body: JSON.stringify({ env: $('#env').value })});
+      toast('Publicado: '+ (res.at || 'OK'));
+      await refreshKPIs();
+    }catch(e){ toast(e.message); }
+  });
+
 })();
 </script>
 </body>
